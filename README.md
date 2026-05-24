@@ -22,6 +22,9 @@ That makes the pattern a good fit for microcontrollers where code size, predicta
 - `examples/stm32f405_hal_main.cpp`: firmware-style `main()` showing how to wire the controller into an STM32 startup flow
 - `src/demo_main.cpp`: runnable simulation showing state transitions over time
 - `tests/state_machine_test.cpp`: small assertion-based test harness
+- `diagrams/blinky.mmd`: Mermaid source used to describe the blinky state graph
+- `tools/mermaid_to_controller.py`: Mermaid-to-`hpp` controller generator
+- `tools/compare_state_transitions.py`: parity checker for states/transitions between headers
 - `CMakeLists.txt`: build configuration for demo and tests
 
 ## State flow
@@ -54,6 +57,33 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ./build/stm32_state_demo
 ```
+
+`ctest` also runs Mermaid parity checks that:
+- generate `blinky_from_mermaid.hpp` from `diagrams/blinky.mmd`
+- verify generated states/transitions match `include/simple_state/blinky_controller.hpp`
+
+## Generate controller headers from Mermaid
+
+The repository includes a small generator that converts Mermaid state transitions into a controller header scaffold compatible with `simple_state::Machine`.
+
+Generate a controller header from a Mermaid diagram:
+
+```bash
+python3 tools/mermaid_to_controller.py \
+	--input diagrams/blinky.mmd \
+	--output generated/blinky_from_mermaid.hpp \
+	--controller BlinkyController
+```
+
+Validate that the generated header contains the same states and transitions as the hand-written blinky controller:
+
+```bash
+python3 tools/compare_state_transitions.py \
+	--expected include/simple_state/blinky_controller.hpp \
+	--actual generated/blinky_from_mermaid.hpp
+```
+
+The comparison command reports `Comparison PASSED` when both state and transition sets are equal.
 
 Expected demo output is similar to:
 

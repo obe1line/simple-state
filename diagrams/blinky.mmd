@@ -1,0 +1,14 @@
+stateDiagram-v2
+    [*] --> BootState
+
+    BootState --> IdleState: self_test_ok
+    BootState --> FaultState: self_test_failed
+
+    IdleState --> LedOnState: button_pressed_or_timeout
+    IdleState --> FaultState: has_fault
+
+    LedOnState --> LedOffState: on_duration_elapsed
+    LedOnState --> FaultState: has_fault
+
+    LedOffState --> LedOnState: off_duration_elapsed
+    LedOffState --> FaultState: has_fault
