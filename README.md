@@ -1,7 +1,7 @@
 # CRTP State Machine for STM32F405 Bare-Metal Firmware
 
 [![CI](https://github.com/obe1line/simple-state/actions/workflows/ci.yml/badge.svg)](https://github.com/obe1line/simple-state/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/obe1line/simple-state)](https://github.com/obe1line/simple-state/blob/main/LICENSE.md)
+[![License](https://img.shields.io/github/license/obe1line/simple-state)](https://github.com/obe1line/simple-state/blob/main/LICENSE)
 [![Latest Release](https://img.shields.io/github/v/release/obe1line/simple-state)](https://github.com/obe1line/simple-state/releases)
 
 This repository contains a small C++20 state machine built with the curiously recurring template pattern (CRTP). The implementation is designed for bare-metal firmware on an STM32F405, but it also includes a host-side simulation and test target so the behavior can be verified on Linux.
