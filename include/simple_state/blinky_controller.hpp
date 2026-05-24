@@ -121,10 +121,10 @@ public:
         }
 
         static void on_update(Context& context) {
-            if (context.board.has_fault()) {
-                context.template transition<FaultState>();
-                return;
-            }
+            // if (context.board.has_fault()) {
+            //     context.template transition<FaultState>();
+            //     return;
+            // }
 
             if (context.elapsed_in_state() >= 750U) {
                 context.template transition<LedOnState>();

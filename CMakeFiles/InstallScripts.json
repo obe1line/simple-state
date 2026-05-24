@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/csz/Code/simple-state/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

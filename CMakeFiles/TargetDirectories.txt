@@ -1,0 +1,5 @@
+/home/csz/Code/simple-state/CMakeFiles/stm32_state_demo.dir
+/home/csz/Code/simple-state/CMakeFiles/state_machine_tests.dir
+/home/csz/Code/simple-state/CMakeFiles/test.dir
+/home/csz/Code/simple-state/CMakeFiles/edit_cache.dir
+/home/csz/Code/simple-state/CMakeFiles/rebuild_cache.dir

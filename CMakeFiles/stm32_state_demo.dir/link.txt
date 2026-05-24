@@ -1,0 +1,1 @@
+/usr/bin/c++ -Wl,--dependency-file=CMakeFiles/stm32_state_demo.dir/link.d CMakeFiles/stm32_state_demo.dir/src/demo_main.cpp.o -o stm32_state_demo
