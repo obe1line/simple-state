@@ -20,6 +20,7 @@ enable_testing()
 add_test(NAME state_machine_tests COMMAND state_machine_tests)
 
 set(MERMAID_GENERATED_HEADER ${CMAKE_CURRENT_BINARY_DIR}/generated/blinky_from_mermaid.hpp)
+set(MERMAID_GENERATED_USER_HEADER ${CMAKE_CURRENT_BINARY_DIR}/generated/blinky_from_mermaid_user.hpp)
 
 add_test(
 	NAME mermaid_generate_blinky_header
@@ -27,6 +28,8 @@ add_test(
 		${CMAKE_CURRENT_SOURCE_DIR}/tools/mermaid_to_controller.py
 		--input ${CMAKE_CURRENT_SOURCE_DIR}/diagrams/blinky.mmd
 		--output ${MERMAID_GENERATED_HEADER}
+		--user-output ${MERMAID_GENERATED_USER_HEADER}
+		--overwrite-user-output
 		--controller BlinkyController
 )
 
@@ -34,8 +37,10 @@ add_test(
 	NAME mermaid_compare_blinky_transitions
 	COMMAND ${Python3_EXECUTABLE}
 		${CMAKE_CURRENT_SOURCE_DIR}/tools/compare_state_transitions.py
-		--expected ${CMAKE_CURRENT_SOURCE_DIR}/include/simple_state/blinky_controller.hpp
-		--actual ${MERMAID_GENERATED_HEADER}
+		--expected-generated ${CMAKE_CURRENT_SOURCE_DIR}/include/simple_state/generated/blinky_controller_generated.hpp
+		--expected-user ${CMAKE_CURRENT_SOURCE_DIR}/include/simple_state/blinky_controller_user.hpp
+		--actual-generated ${MERMAID_GENERATED_HEADER}
+		--actual-user ${MERMAID_GENERATED_USER_HEADER}
 )
 
 set_tests_properties(

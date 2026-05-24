@@ -20,7 +20,9 @@ That makes the pattern a good fit for microcontrollers where code size, predicta
 ## Project layout
 
 - `include/simple_state/crtp_state_machine.hpp`: reusable CRTP state machine core
-- `include/simple_state/blinky_controller.hpp`: STM32-friendly example controller with `Boot`, `Idle`, `LedOn`, `LedOff`, and `Fault` states
+- `include/simple_state/generated/blinky_controller_generated.hpp`: generated controller structure and state declarations
+- `include/simple_state/blinky_controller_user.hpp`: user-owned state behavior and custom controller context data
+- `include/simple_state/blinky_controller.hpp`: stable include that composes generated and user-owned blinky controller code
 - `include/simple_state/simulated_board.hpp`: host-side board shim used by the demo and tests
 - `include/simple_state/stm32f405_hal_board.hpp`: concrete STM32F405 HAL adapter that satisfies the controller board interface
 - `examples/stm32f405_hal_main.cpp`: firmware-style `main()` showing how to wire the controller into an STM32 startup flow
@@ -70,21 +72,45 @@ ctest --test-dir build --output-on-failure
 
 The repository includes a small generator that converts Mermaid state transitions into a controller header scaffold compatible with `simple_state::Machine`.
 
+The generated output is split so you can safely regenerate controller structure without overwriting your behavior code:
+
+- the generated header owns the controller type, state declarations, and hook call sites
+- the user header owns `on_enter` / `on_update` / `on_exit` logic plus any custom context data in `Hooks::Data`
+- when the generated file lives in `include/simple_state/generated/*_generated.hpp`, the tool also emits a stable wrapper header in `include/simple_state/*.hpp`
+- the tool infers `BlinkyController` and `simple_state` from `include/simple_state/generated/blinky_controller_generated.hpp`, so those flags can usually be omitted
+- rerunning the generator preserves the user header unless you pass `--overwrite-user-output`
+
 Generate a controller header from a Mermaid diagram:
 
 ```bash
 python3 tools/mermaid_to_controller.py \
 	--input diagrams/blinky.mmd \
-	--output generated/blinky_from_mermaid.hpp \
-	--controller BlinkyController
+	--output include/simple_state/generated/blinky_controller_generated.hpp
 ```
 
-Validate that the generated header contains the same states and transitions as the hand-written blinky controller:
+With that project-style output path, the generator defaults to:
+
+- `include/simple_state/generated/blinky_controller_generated.hpp`
+- `include/simple_state/blinky_controller_user.hpp`
+- `include/simple_state/blinky_controller.hpp`
+
+Preview the inferred paths and metadata without writing any files:
+
+```bash
+python3 tools/mermaid_to_controller.py \
+	--input diagrams/blinky.mmd \
+	--output include/simple_state/generated/blinky_controller_generated.hpp \
+	--dry-run
+```
+
+Validate that the generated split files contain the same states and transitions as the hand-written blinky controller:
 
 ```bash
 python3 tools/compare_state_transitions.py \
-	--expected include/simple_state/blinky_controller.hpp \
-	--actual generated/blinky_from_mermaid.hpp
+	--expected-generated include/simple_state/generated/blinky_controller_generated.hpp \
+	--expected-user include/simple_state/blinky_controller_user.hpp \
+	--actual-generated generated/blinky_from_mermaid.hpp \
+	--actual-user generated/blinky_from_mermaid_user.hpp
 ```
 
 The comparison command reports `Comparison PASSED` when both state and transition sets are equal.

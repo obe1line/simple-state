@@ -3,24 +3,58 @@ import argparse
 import re
 from pathlib import Path
 
-STATE_BLOCK_RE = re.compile(
-    r"struct\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*State<[^>]+>\s*\{(.*?)\n\s*\};",
-    re.DOTALL,
+STATE_BLOCK_RE = re.compile(r"struct\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*State<[^>]+>\s*\{")
+HOOK_SIGNATURE_RE = re.compile(
+    r"static\s+void\s+([A-Za-z_][A-Za-z0-9_]*)_on_(?:enter|update|exit)\s*\([^)]*\)\s*\{"
 )
-TRANSITION_CALL_RE = re.compile(r"transition<\s*([A-Za-z_][A-Za-z0-9_]*)\s*>\s*\(")
+TRANSITION_CALL_RE = re.compile(r"transition<\s*(?:typename\s+)?(?:Controller::)?([A-Za-z_][A-Za-z0-9_]*)\s*>")
 
 
-def parse_header(path: Path):
+def strip_cpp_comments(source: str) -> str:
+    without_block_comments = re.sub(r"/\*.*?\*/", "", source, flags=re.DOTALL)
+    return re.sub(r"//.*", "", without_block_comments)
+
+
+def hook_prefix_to_state(prefix: str) -> str:
+    state_name = "".join(part.capitalize() for part in prefix.split("_"))
+    return f"{state_name}State"
+
+
+def parse_generated_states(path: Path):
     text = path.read_text(encoding="utf-8")
-    states = set()
+    return set(STATE_BLOCK_RE.findall(text))
+
+
+def parse_user_transitions(path: Path):
+    text = strip_cpp_comments(path.read_text(encoding="utf-8"))
     transitions = set()
 
-    for state_name, block in STATE_BLOCK_RE.findall(text):
-        states.add(state_name)
-        for target in TRANSITION_CALL_RE.findall(block):
-            transitions.add((state_name, target))
+    lines = text.splitlines()
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        match = HOOK_SIGNATURE_RE.search(line)
+        if match is None:
+            index += 1
+            continue
 
-    return states, transitions
+        hook_prefix = match.group(1)
+        source_state = hook_prefix_to_state(hook_prefix)
+        body_lines = []
+        brace_depth = line.count("{") - line.count("}")
+        index += 1
+
+        while index < len(lines) and brace_depth > 0:
+            body_line = lines[index]
+            brace_depth += body_line.count("{") - body_line.count("}")
+            body_lines.append(body_line)
+            index += 1
+
+        body_text = "\n".join(body_lines)
+        for target in TRANSITION_CALL_RE.findall(body_text):
+            transitions.add((source_state, target))
+
+    return transitions
 
 
 def format_pairs(pairs):
@@ -30,13 +64,18 @@ def format_pairs(pairs):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Compare states/transitions between two controller headers")
-    parser.add_argument("--expected", required=True, help="Reference header path")
-    parser.add_argument("--actual", required=True, help="Generated header path")
+    parser = argparse.ArgumentParser(description="Compare states and transitions between split controller files")
+    parser.add_argument("--expected-generated", required=True, help="Reference generated controller header path")
+    parser.add_argument("--expected-user", required=True, help="Reference user hooks header path")
+    parser.add_argument("--actual-generated", required=True, help="Generated controller header path under test")
+    parser.add_argument("--actual-user", required=True, help="Generated user hooks header path under test")
     args = parser.parse_args()
 
-    expected_states, expected_transitions = parse_header(Path(args.expected))
-    actual_states, actual_transitions = parse_header(Path(args.actual))
+    expected_states = parse_generated_states(Path(args.expected_generated))
+    actual_states = parse_generated_states(Path(args.actual_generated))
+
+    expected_transitions = parse_user_transitions(Path(args.expected_user))
+    actual_transitions = parse_user_transitions(Path(args.actual_user))
 
     missing_states = expected_states - actual_states
     extra_states = actual_states - expected_states
