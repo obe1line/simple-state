@@ -1,0 +1,90 @@
+#pragma once
+
+#include <cstdint>
+
+#include "simple_state/crtp_state_machine.hpp"
+
+namespace {{ namespace }} {
+
+template <typename Board>
+struct {{ controller_name }}Hooks;
+
+template <typename Board>
+class {{ controller_name }} {
+public:
+{% for state in states %}
+    struct {{ state }};
+{% endfor %}
+
+    struct Context : {{ controller_name }}Hooks<Board>::Data {
+        Board& board;
+        Machine<Context>* machine{};
+        std::uint32_t state_started_at{};
+
+        explicit Context(Board& board_ref) : board(board_ref) {}
+
+        [[nodiscard]] std::uint32_t now() const {
+            return board.millis();
+        }
+
+        void mark_state_entry() {
+            state_started_at = now();
+        }
+
+        [[nodiscard]] std::uint32_t elapsed_in_state() const {
+            return now() - state_started_at;
+        }
+
+        template <typename NextState>
+        void transition() {
+            machine->template transition_to<NextState>();
+        }
+    };
+
+{% for state in states %}
+    struct {{ state }} : State<{{ state }}, Context> {
+        static void on_enter(Context& context) {
+            context.mark_state_entry();
+            {{ controller_name }}Hooks<Board>::{{ state | hook_prefix }}_on_enter(context);
+        }
+
+        static void on_update(Context& context) {
+            {{ controller_name }}Hooks<Board>::{{ state | hook_prefix }}_on_update(context);
+        }
+
+        static void on_exit(Context& context) {
+            {{ controller_name }}Hooks<Board>::{{ state | hook_prefix }}_on_exit(context);
+        }
+
+        static const char* name() {
+            return "{{ state | display_name }}";
+        }
+    };
+
+{% endfor %}
+    explicit {{ controller_name }}(Board& board) : context_{board}, machine_(context_) {
+        context_.machine = &machine_;
+    }
+
+    void start() {
+        machine_.template start<{{ initial_state }}>();
+    }
+
+    void run_once() {
+        machine_.dispatch();
+    }
+
+    [[nodiscard]] const char* state_name() const {
+        return machine_.current_name();
+    }
+
+    [[nodiscard]] bool led_is_on() const {
+        return context_.board.led_is_on();
+    }
+
+private:
+    Context context_;
+    Machine<Context> machine_;
+};
+
+}  // namespace {{ namespace }}

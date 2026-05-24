@@ -3,6 +3,10 @@ import argparse
 import re
 from pathlib import Path
 
+from jinja2 import Environment, FileSystemLoader
+
+TEMPLATES_DIR = Path(__file__).parent / "templates"
+
 TRANSITION_RE = re.compile(
     r"^\s*([A-Za-z_][A-Za-z0-9_]*|\[\*\])\s*-->\s*([A-Za-z_][A-Za-z0-9_]*|\[\*\])(?:\s*:\s*(.+))?\s*$"
 )
@@ -112,102 +116,25 @@ def infer_namespace(output_path: Path) -> str:
     return "simple_state"
 
 
+def _env() -> Environment:
+    env = Environment(
+        loader=FileSystemLoader(TEMPLATES_DIR),
+        keep_trailing_newline=True,
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+    env.filters["hook_prefix"] = state_hook_prefix
+    env.filters["display_name"] = state_display_name
+    return env
+
+
 def render_generated_controller(namespace: str, controller_name: str, states, initial_state: str) -> str:
-    lines = []
-    lines.append("#pragma once")
-    lines.append("")
-    lines.append("#include <cstdint>")
-    lines.append("")
-    lines.append('#include "simple_state/crtp_state_machine.hpp"')
-    lines.append("")
-    lines.append(f"namespace {namespace} {{")
-    lines.append("")
-    lines.append("template <typename Board>")
-    lines.append(f"struct {controller_name}Hooks;")
-    lines.append("")
-    lines.append("template <typename Board>")
-    lines.append(f"class {controller_name} {{")
-    lines.append("public:")
-
-    for state in states:
-        lines.append(f"    struct {state};")
-    lines.append("")
-
-    lines.append(f"    struct Context : {controller_name}Hooks<Board>::Data {{")
-    lines.append("        Board& board;")
-    lines.append("        Machine<Context>* machine{};")
-    lines.append("        std::uint32_t state_started_at{};")
-    lines.append("")
-    lines.append("        explicit Context(Board& board_ref) : board(board_ref) {}")
-    lines.append("")
-    lines.append("        [[nodiscard]] std::uint32_t now() const {")
-    lines.append("            return board.millis();")
-    lines.append("        }")
-    lines.append("")
-    lines.append("        void mark_state_entry() {")
-    lines.append("            state_started_at = now();")
-    lines.append("        }")
-    lines.append("")
-    lines.append("        [[nodiscard]] std::uint32_t elapsed_in_state() const {")
-    lines.append("            return now() - state_started_at;")
-    lines.append("        }")
-    lines.append("")
-    lines.append("        template <typename NextState>")
-    lines.append("        void transition() {")
-    lines.append("            machine->template transition_to<NextState>();")
-    lines.append("        }")
-    lines.append("    };")
-    lines.append("")
-
-    for state in states:
-        hook_prefix = state_hook_prefix(state)
-        lines.append(f"    struct {state} : State<{state}, Context> {{")
-        lines.append("        static void on_enter(Context& context) {")
-        lines.append(f"            {controller_name}Hooks<Board>::{hook_prefix}_on_enter(context);")
-        lines.append("        }")
-        lines.append("")
-        lines.append("        static void on_update(Context& context) {")
-        lines.append(f"            {controller_name}Hooks<Board>::{hook_prefix}_on_update(context);")
-        lines.append("        }")
-        lines.append("")
-        lines.append("        static void on_exit(Context& context) {")
-        lines.append(f"            {controller_name}Hooks<Board>::{hook_prefix}_on_exit(context);")
-        lines.append("        }")
-        lines.append("")
-        lines.append("        static const char* name() {")
-        lines.append(f"            return \"{state_display_name(state)}\";")
-        lines.append("        }")
-        lines.append("    };")
-        lines.append("")
-
-    lines.append(f"    explicit {controller_name}(Board& board) : context_{{board}}, machine_(context_) {{")
-    lines.append("        context_.machine = &machine_;")
-    lines.append("    }")
-    lines.append("")
-    lines.append("    void start() {")
-    lines.append(f"        machine_.template start<{initial_state}>();")
-    lines.append("    }")
-    lines.append("")
-    lines.append("    void run_once() {")
-    lines.append("        machine_.dispatch();")
-    lines.append("    }")
-    lines.append("")
-    lines.append("    [[nodiscard]] const char* state_name() const {")
-    lines.append("        return machine_.current_name();")
-    lines.append("    }")
-    lines.append("")
-    lines.append("    [[nodiscard]] bool led_is_on() const {")
-    lines.append("        return context_.board.led_is_on();")
-    lines.append("    }")
-    lines.append("")
-    lines.append("private:")
-    lines.append("    Context context_;")
-    lines.append("    Machine<Context> machine_;")
-    lines.append("};")
-    lines.append("")
-    lines.append(f"}}  // namespace {namespace}")
-    lines.append("")
-    return "\n".join(lines)
+    return _env().get_template("controller_generated.hpp.jinja").render(
+        namespace=namespace,
+        controller_name=controller_name,
+        states=states,
+        initial_state=initial_state,
+    )
 
 
 def render_user_hooks(namespace: str, controller_name: str, generated_include: str, states, transitions) -> str:
@@ -215,60 +142,20 @@ def render_user_hooks(namespace: str, controller_name: str, generated_include: s
     for src, dst, label in transitions:
         transitions_by_source[src].append((dst, label))
 
-    lines = []
-    lines.append("#pragma once")
-    lines.append("")
-    lines.append(f'#include "{generated_include}"')
-    lines.append("")
-    lines.append(f"namespace {namespace} {{")
-    lines.append("")
-    lines.append("template <typename Board>")
-    lines.append(f"struct {controller_name}Hooks {{")
-    lines.append(f"    using Controller = {controller_name}<Board>;")
-    lines.append("    using Context = typename Controller::Context;")
-    lines.append("")
-    lines.append("    struct Data {};")
-    lines.append("")
-
-    for state in states:
-        hook_prefix = state_hook_prefix(state)
-        lines.append(f"    static void {hook_prefix}_on_enter(Context& context) {{")
-        lines.append("        context.mark_state_entry();")
-        lines.append("    }")
-        lines.append("")
-        lines.append(f"    static void {hook_prefix}_on_update(Context& context) {{")
-        state_transitions = transitions_by_source.get(state, [])
-        if not state_transitions:
-            lines.append("        (void)context;")
-        else:
-            for index, (dst, label) in enumerate(state_transitions):
-                transition_label = f" [{label}]" if label else ""
-                lines.append(f"        // TODO: replace placeholder condition for {state} -> {dst}{transition_label}")
-                lines.append("        if (false) {")
-                lines.append(f"            context.template transition<typename Controller::{dst}>();")
-                lines.append("        }")
-                if index != len(state_transitions) - 1:
-                    lines.append("")
-        lines.append("    }")
-        lines.append("")
-        lines.append(f"    static void {hook_prefix}_on_exit(Context&) {{}}")
-        lines.append("")
-
-    lines.append("};")
-    lines.append("")
-    lines.append(f"}}  // namespace {namespace}")
-    lines.append("")
-    return "\n".join(lines)
+    return _env().get_template("controller_user.hpp.jinja").render(
+        namespace=namespace,
+        controller_name=controller_name,
+        generated_include=generated_include,
+        states=states,
+        transitions_by_source=transitions_by_source,
+    )
 
 
 def render_wrapper_header(generated_include: str, user_include: str) -> str:
-    lines = []
-    lines.append("#pragma once")
-    lines.append("")
-    lines.append(f'#include "{generated_include}"')
-    lines.append(f'#include "{user_include}"')
-    lines.append("")
-    return "\n".join(lines)
+    return _env().get_template("controller_wrapper.hpp.jinja").render(
+        generated_include=generated_include,
+        user_include=user_include,
+    )
 
 
 def main():

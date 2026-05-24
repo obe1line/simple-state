@@ -19,31 +19,41 @@ target_link_libraries(state_machine_tests PRIVATE simple_state)
 enable_testing()
 add_test(NAME state_machine_tests COMMAND state_machine_tests)
 
-set(MERMAID_GENERATED_HEADER ${CMAKE_CURRENT_BINARY_DIR}/generated/blinky_from_mermaid.hpp)
-set(MERMAID_GENERATED_USER_HEADER ${CMAKE_CURRENT_BINARY_DIR}/generated/blinky_from_mermaid_user.hpp)
+set(MERMAID_BLINKY_GENERATED_HEADER
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/blinky_controller_generated.hpp)
+set(MERMAID_BLINKY_GENERATED_USER_HEADER
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/blinky_controller_user.hpp)
+
+file(GLOB MERMAID_DIAGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/diagrams/*.mmd")
+foreach(DIAGRAM IN LISTS MERMAID_DIAGRAMS)
+    cmake_path(GET DIAGRAM STEM DIAGRAM_STEM)
+    set(GENERATED_HEADER
+            ${CMAKE_CURRENT_BINARY_DIR}/generated/${DIAGRAM_STEM}_controller_generated.hpp)
+    set(GENERATED_USER_HEADER
+            ${CMAKE_CURRENT_BINARY_DIR}/generated/${DIAGRAM_STEM}_controller_user.hpp)
+
+    add_test(
+            NAME mermaid_generate_${DIAGRAM_STEM}_header
+            COMMAND ${Python3_EXECUTABLE}
+                    ${CMAKE_CURRENT_SOURCE_DIR}/tools/mermaid_to_controller.py
+                    --input ${DIAGRAM}
+                    --output ${GENERATED_HEADER}
+                    --user-output ${GENERATED_USER_HEADER}
+                    --overwrite-user-output
+    )
+endforeach()
 
 add_test(
-	NAME mermaid_generate_blinky_header
-	COMMAND ${Python3_EXECUTABLE}
-		${CMAKE_CURRENT_SOURCE_DIR}/tools/mermaid_to_controller.py
-		--input ${CMAKE_CURRENT_SOURCE_DIR}/diagrams/blinky.mmd
-		--output ${MERMAID_GENERATED_HEADER}
-		--user-output ${MERMAID_GENERATED_USER_HEADER}
-		--overwrite-user-output
-		--controller BlinkyController
-)
-
-add_test(
-	NAME mermaid_compare_blinky_transitions
-	COMMAND ${Python3_EXECUTABLE}
-		${CMAKE_CURRENT_SOURCE_DIR}/tools/compare_state_transitions.py
-		--expected-generated ${CMAKE_CURRENT_SOURCE_DIR}/include/simple_state/generated/blinky_controller_generated.hpp
-		--expected-user ${CMAKE_CURRENT_SOURCE_DIR}/include/simple_state/blinky_controller_user.hpp
-		--actual-generated ${MERMAID_GENERATED_HEADER}
-		--actual-user ${MERMAID_GENERATED_USER_HEADER}
+        NAME mermaid_compare_blinky_transitions
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tools/compare_state_transitions.py
+                --expected-generated ${CMAKE_CURRENT_SOURCE_DIR}/include/simple_state/generated/blinky_controller_generated.hpp
+                --expected-user ${CMAKE_CURRENT_SOURCE_DIR}/include/simple_state/blinky_controller_user.hpp
+                --actual-generated ${MERMAID_BLINKY_GENERATED_HEADER}
+                --actual-user ${MERMAID_BLINKY_GENERATED_USER_HEADER}
 )
 
 set_tests_properties(
-	mermaid_compare_blinky_transitions
-	PROPERTIES DEPENDS mermaid_generate_blinky_header
+        mermaid_compare_blinky_transitions
+        PROPERTIES DEPENDS mermaid_generate_blinky_header
 )

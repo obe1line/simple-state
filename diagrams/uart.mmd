@@ -1,0 +1,12 @@
+stateDiagram-v2
+    [*] --> initial
+    
+    initial --> ready: entry
+    
+    ready --> tx_cmd: send_cmd
+    ready --> tx_rsp: send_rsp
+    ready --> rx_line: recv_line
+
+	tx_cmd --> ready
+	tx_rsp --> ready
+	rx_line --> ready

@@ -15,7 +15,6 @@ struct BlinkyControllerHooks {
     };
 
     static void boot_on_enter(Context& context) {
-        context.mark_state_entry();
         context.board.set_led(false);
     }
 
@@ -35,7 +34,6 @@ struct BlinkyControllerHooks {
     static void boot_on_exit(Context&) {}
 
     static void idle_on_enter(Context& context) {
-        context.mark_state_entry();
         context.board.set_led(false);
     }
 
@@ -53,7 +51,6 @@ struct BlinkyControllerHooks {
     static void idle_on_exit(Context&) {}
 
     static void led_on_on_enter(Context& context) {
-        context.mark_state_entry();
         context.board.set_led(true);
     }
 
@@ -71,7 +68,6 @@ struct BlinkyControllerHooks {
     static void led_on_on_exit(Context&) {}
 
     static void led_off_on_enter(Context& context) {
-        context.mark_state_entry();
         context.board.set_led(false);
     }
 
@@ -89,7 +85,6 @@ struct BlinkyControllerHooks {
     static void led_off_on_exit(Context&) {}
 
     static void fault_on_enter(Context& context) {
-        context.mark_state_entry();
         context.fault_toggle_at = context.now();
         context.fault_led_on = true;
         context.board.set_led(true);

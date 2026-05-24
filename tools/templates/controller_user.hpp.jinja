@@ -1,0 +1,42 @@
+#pragma once
+
+#include "{{ generated_include }}"
+
+namespace {{ namespace }} {
+
+template <typename Board>
+struct {{ controller_name }}Hooks {
+    using Controller = {{ controller_name }}<Board>;
+    using Context = typename Controller::Context;
+
+    struct Data {};
+
+{% for state in states %}
+    static void {{ state | hook_prefix }}_on_enter(Context& context) {
+        (void)context;
+    }
+
+    static void {{ state | hook_prefix }}_on_update(Context& context) {
+{% set state_transitions = transitions_by_source.get(state, []) %}
+{% if not state_transitions %}
+        (void)context;
+{% else %}
+{% for dst, label in state_transitions %}
+        // TODO: replace placeholder condition for {{ state }} -> {{ dst }}{% if label %} [{{ label }}]{% endif %}
+
+        if (false) {
+            context.template transition<typename Controller::{{ dst }}>();
+        }
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}
+{% endif %}
+    }
+
+    static void {{ state | hook_prefix }}_on_exit(Context&) {}
+
+{% endfor %}
+};
+
+}  // namespace {{ namespace }}
